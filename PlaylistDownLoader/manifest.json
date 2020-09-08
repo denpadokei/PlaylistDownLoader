@@ -10,7 +10,7 @@
     "SongCore": "^2.9.11",
     "BS Utils": "^1.4.10",
     "PlaylistLoaderLite": "^1.2.1",
-    "BeatSaberSharp": "^1.6.0"
+    "BeatSaverSharp": "^1.6.0"
   },
   "features": []
 }
