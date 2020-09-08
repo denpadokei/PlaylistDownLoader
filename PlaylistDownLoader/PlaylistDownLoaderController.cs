@@ -6,6 +6,7 @@ using SongCore;
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
@@ -102,22 +103,25 @@ namespace PlaylistDownLoader
         private async Task DownloadSong(string hash)
         {
             try {
+                var timer = new Stopwatch();
+                timer.Start();
                 var beatmap = await this.Current.Hash(hash);
                 if (beatmap == null) {
                     return;
                 }
-                Logger.log.Info($"DownloadedSongInfo : {beatmap.Metadata.SongName}");
+                Logger.log.Info($"DownloadedSongInfo : {beatmap.Metadata.SongName} ({timer.ElapsedMilliseconds} ms)");
                 var songDirectoryPath = Path.Combine(_customLevelsDirectory, $"{beatmap.Key}({Regex.Replace(beatmap.Metadata.SongName, "[/:*<>|]", "")} - {Regex.Replace(beatmap.Metadata.SongAuthorName, "[/:*<>|]", "")})");
                 while (Plugin.IsInGame) {
                     await Task.Delay(200);
                 }
                 var buff = await beatmap.DownloadZip();
-                Logger.log.Info($"DownloadedSongZip : {beatmap.Metadata.SongName}");
+                Logger.log.Info($"DownloadedSongZip : {beatmap.Metadata.SongName}  ({timer.ElapsedMilliseconds} ms)");
                 using (var ms = new MemoryStream(buff))
                 using (var archive = new ZipArchive(ms, ZipArchiveMode.Read)) {
                     archive.ExtractToDirectory(songDirectoryPath);
                 }
-                Logger.log.Info($"Downloaded : {beatmap.Metadata.SongName}");
+                timer.Stop();
+                Logger.log.Info($"Downloaded : {beatmap.Metadata.SongName}  ({timer.ElapsedMilliseconds} ms)");
                 AnyDownloaded = true;
             }
             catch (Exception e) {

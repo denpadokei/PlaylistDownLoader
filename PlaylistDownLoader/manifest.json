@@ -3,9 +3,9 @@
   "id": "PlaylistDownLoader",
   "name": "PlaylistDownLoader",
   "author": "",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "",
-  "gameVersion": "1.9.0",
+  "gameVersion": "1.11.1",
   "dependsOn": {
     "SongCore": "^2.9.11",
     "BS Utils": "^1.4.10",
