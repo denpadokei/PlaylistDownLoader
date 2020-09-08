@@ -7,7 +7,9 @@
   "description": "",
   "gameVersion": "1.9.0",
   "dependsOn": {
-
+    "SongCore": "^2.9.11",
+    "BS Utils": "^1.4.10",
+    "PlaylistLoaderLite": "^1.2.1"
   },
   "features": []
 }

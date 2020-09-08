@@ -8,6 +8,7 @@ using IPA.Config.Stores;
 using UnityEngine.SceneManagement;
 using UnityEngine;
 using IPALogger = IPA.Logging.Logger;
+using BS_Utils.Utilities;
 
 namespace PlaylistDownLoader
 {
@@ -17,6 +18,8 @@ namespace PlaylistDownLoader
     {
         internal static Plugin instance { get; private set; }
         internal static string Name => "PlaylistDownLoader";
+
+        public static bool IsInGame { get; private set; }
 
         [Init]
         /// <summary>
@@ -47,15 +50,26 @@ namespace PlaylistDownLoader
         public void OnApplicationStart()
         {
             Logger.log.Debug("OnApplicationStart");
+            SceneManager.activeSceneChanged += this.SceneManager_activeSceneChanged;
+            BSEvents.lateMenuSceneLoadedFresh += this.BSEvents_lateMenuSceneLoadedFresh;
             new GameObject("PlaylistDownLoaderController").AddComponent<PlaylistDownLoaderController>();
+        }
 
+        private async void BSEvents_lateMenuSceneLoadedFresh(ScenesTransitionSetupDataSO obj)
+        {
+            await PlaylistDownLoaderController.instance.CheckPlaylistsSong();
+        }
+
+        private void SceneManager_activeSceneChanged(Scene arg0, Scene arg1)
+        {
+            IsInGame = arg1.name == "GameCore";
         }
 
         [OnExit]
         public void OnApplicationQuit()
         {
             Logger.log.Debug("OnApplicationQuit");
-
+            SceneManager.activeSceneChanged -= this.SceneManager_activeSceneChanged;
         }
     }
 }
