@@ -114,6 +114,9 @@ namespace PlaylistDownLoader
                 while (Plugin.IsInGame) {
                     await Task.Delay(200);
                 }
+                if (File.Exists(songDirectoryPath)) {
+                    return;
+                }
                 var buff = await beatmap.DownloadZip();
                 Logger.log.Info($"DownloadedSongZip : {beatmap.Metadata.SongName}  ({timer.ElapsedMilliseconds} ms)");
                 using (var ms = new MemoryStream(buff))
