@@ -1,6 +1,7 @@
 ﻿using BeatSaverSharp;
 using Newtonsoft.Json;
 using PlaylistDownLoader.Models;
+using PlaylistDownLoader.Utilites;
 using PlaylistLoaderLite.HarmonyPatches;
 using SongCore;
 using System;
@@ -13,7 +14,9 @@ using System.Linq;
 using System.Reflection;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Threading;
 using System.Threading.Tasks;
+using TMPro;
 using UnityEngine;
 
 namespace PlaylistDownLoader
@@ -24,10 +27,13 @@ namespace PlaylistDownLoader
     /// </summary>
     public class PlaylistDownLoaderController : MonoBehaviour
     {
-        private static readonly string _tempPath = $@"{Path.GetTempPath()}\PlaylistDownloader";
         private static readonly string _playlistsDirectory = Path.Combine(Environment.CurrentDirectory, "Playlists");
         private static readonly string _customLevelsDirectory = Path.Combine(Environment.CurrentDirectory, "Beat Saber_Data", "CustomLevels");
         private static readonly HashSet<string> _downloadedSongHash = new HashSet<string>();
+        private static readonly SemaphoreSlim semaphoreSlim = new SemaphoreSlim(4, 4);
+        private static DateTime lastUpdateTime;
+
+        private TMP_Text progressText;
 
         public bool AnyDownloaded { get; private set; }
 
@@ -54,6 +60,15 @@ namespace PlaylistDownLoader
 
             var httpOption = new HttpOptions() { ApplicationName = "PlaylistDownloader", Version = Assembly.GetExecutingAssembly().GetName().Version };
             this.Current = new BeatSaver(httpOption);
+
+            this.progressText = Utility.CreateNotificationText("Finish Initiaraize.");
+        }
+
+        private void FixedUpdate()
+        {
+            if (!string.IsNullOrEmpty(progressText.text) && DateTime.Now >= DateTime.Now.AddSeconds(5)) {
+                progressText.text = "";
+            }
         }
 
         /// <summary>
@@ -74,6 +89,7 @@ namespace PlaylistDownLoader
 
             AnyDownloaded = false;
             List<FileInfo> playlists = new List<FileInfo>();
+            List<Task> downloadTask = new List<Task>();
             playlists.AddRange(Directory.EnumerateFiles(_playlistsDirectory, "*.json").Select(x => new FileInfo(x)));
             playlists.AddRange(Directory.EnumerateFiles(_playlistsDirectory, "*.bplist").Select(x => new FileInfo(x)));
             try {
@@ -86,14 +102,15 @@ namespace PlaylistDownLoader
                             _downloadedSongHash.Add(song.hash.ToUpper());
                             continue;
                         }
-                        await this.DownloadSong(song.hash);
+                        downloadTask.Add(this.DownloadSong(song.hash));
                         _downloadedSongHash.Add(song.hash.ToUpper());
                     }
                 }
-
+                await Task.WhenAll(downloadTask);
                 if (AnyDownloaded) {
                     StartCoroutine(RefreshSongsAndPlaylists());
                 }
+                ChengeText("Checked PlaylitsSongs");
             }
             catch (Exception e) {
                 Logger.log.Error(e);
@@ -102,10 +119,13 @@ namespace PlaylistDownLoader
 
         private async Task DownloadSong(string hash)
         {
+            var timer = new Stopwatch();
+            Beatmap beatmap = null;
             try {
-                var timer = new Stopwatch();
+                await semaphoreSlim.WaitAsync();
+
                 timer.Start();
-                var beatmap = await this.Current.Hash(hash);
+                beatmap = await this.Current.Hash(hash);
                 if (beatmap == null) {
                     return;
                 }
@@ -117,18 +137,23 @@ namespace PlaylistDownLoader
                 if (File.Exists(songDirectoryPath)) {
                     return;
                 }
-                var buff = await beatmap.DownloadZip();
-                Logger.log.Info($"DownloadedSongZip : {beatmap.Metadata.SongName}  ({timer.ElapsedMilliseconds} ms)");
-                using (var ms = new MemoryStream(buff))
+
+                using (var ms = new MemoryStream(await beatmap.DownloadZip()))
                 using (var archive = new ZipArchive(ms, ZipArchiveMode.Read)) {
+                    Logger.log.Info($"DownloadedSongZip : {beatmap.Metadata.SongName}  ({timer.ElapsedMilliseconds} ms)");
                     archive.ExtractToDirectory(songDirectoryPath);
+                    this.ChengeText($"Downloaded {beatmap.Metadata.SongName}");
                 }
-                timer.Stop();
-                Logger.log.Info($"Downloaded : {beatmap.Metadata.SongName}  ({timer.ElapsedMilliseconds} ms)");
+                
                 AnyDownloaded = true;
             }
             catch (Exception e) {
                 Logger.log.Error(e);
+            }
+            finally {
+                timer.Stop();
+                Logger.log.Info($"Downloaded : {beatmap.Metadata.SongName}  ({timer.ElapsedMilliseconds} ms)");
+                semaphoreSlim.Release();
             }
         }
 
@@ -138,6 +163,16 @@ namespace PlaylistDownLoader
             Loader.Instance.RefreshSongs(false);
             yield return new WaitWhile(() => Plugin.IsInGame || Loader.AreSongsLoading);
             PlaylistCollectionOverride.refreshPlaylists();
+        }
+
+        private void ChengeText(string message)
+        {
+            HMMainThreadDispatcher.instance.Enqueue(() =>
+            {
+                Logger.log.Info(message);
+                progressText.text = $"PlaylistDownloader - {message}";
+                lastUpdateTime = DateTime.Now;
+            });
         }
     }
 }
