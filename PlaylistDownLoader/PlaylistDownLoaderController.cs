@@ -30,7 +30,7 @@ namespace PlaylistDownLoader
         private static readonly string _playlistsDirectory = Path.Combine(Environment.CurrentDirectory, "Playlists");
         private static readonly string _customLevelsDirectory = Path.Combine(Environment.CurrentDirectory, "Beat Saber_Data", "CustomLevels");
         private static readonly HashSet<string> _downloadedSongHash = new HashSet<string>();
-        private static readonly SemaphoreSlim semaphoreSlim = new SemaphoreSlim(4, 4);
+        private static readonly SemaphoreSlim semaphoreSlim = new SemaphoreSlim(2, 2);
         private static DateTime lastUpdateTime;
 
         private TMP_Text progressText;
@@ -125,8 +125,13 @@ namespace PlaylistDownLoader
             }
         }
 
+        
+
         private async Task DownloadSong(string hash)
         {
+            ThreadPool.GetMinThreads(out _, out var min);
+            ThreadPool.SetMinThreads(48, min);
+
             var timer = new Stopwatch();
             Beatmap beatmap = null;
             try {
@@ -138,6 +143,7 @@ namespace PlaylistDownLoader
                 }
                 beatmap = await this.Current.Hash(hash).ConfigureAwait(false);
                 if (beatmap == null) {
+                    Logger.log.Info($"Beatmap is not find. {hash}");
                     return;
                 }
                 Logger.log.Info($"DownloadedSongInfo : {beatmap.Metadata.SongName} ({timer.ElapsedMilliseconds} ms)");
@@ -162,8 +168,10 @@ namespace PlaylistDownLoader
                 Logger.log.Error(e);
             }
             finally {
-                timer.Stop();
-                Logger.log.Info($"Downloaded : {beatmap.Metadata.SongName}  ({timer.ElapsedMilliseconds} ms)");
+                if (timer.IsRunning) {
+                    timer.Stop();
+                }
+                Logger.log.Info($"Downloaded : {beatmap?.Metadata.SongName}  ({timer.ElapsedMilliseconds} ms)");
                 semaphoreSlim.Release();
             }
         }
