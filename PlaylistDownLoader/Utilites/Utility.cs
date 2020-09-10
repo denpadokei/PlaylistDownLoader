@@ -8,7 +8,7 @@ using UnityEngine;
 
 namespace PlaylistDownLoader.Utilites
 {
-    public class Utility : MonoBehaviour
+    public class Utility
     {
         public static TextMeshProUGUI CreateNotificationText(string text)
         {
