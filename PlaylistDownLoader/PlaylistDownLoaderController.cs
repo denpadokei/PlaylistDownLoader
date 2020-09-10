@@ -30,7 +30,7 @@ namespace PlaylistDownLoader
         private static readonly string _playlistsDirectory = Path.Combine(Environment.CurrentDirectory, "Playlists");
         private static readonly string _customLevelsDirectory = Path.Combine(Environment.CurrentDirectory, "Beat Saber_Data", "CustomLevels");
         private static readonly HashSet<string> _downloadedSongHash = new HashSet<string>();
-        private static readonly SemaphoreSlim semaphoreSlim = new SemaphoreSlim(4, 4);
+        private static readonly SemaphoreSlim semaphoreSlim = new SemaphoreSlim(2, 2);
         private static DateTime lastUpdateTime;
 
         private TMP_Text progressText;
@@ -58,15 +58,16 @@ namespace PlaylistDownLoader
             instance = this;
             Logger.log?.Debug($"{name}: Awake()");
 
-            var httpOption = new HttpOptions() { ApplicationName = "PlaylistDownloader", Version = Assembly.GetExecutingAssembly().GetName().Version };
+            var httpOption = new HttpOptions() { ApplicationName = "PlaylistDownloader", Version = Assembly.GetExecutingAssembly().GetName().Version, Timeout = new TimeSpan(0, 0, 10), HandleRateLimits = false };
             this.Current = new BeatSaver(httpOption);
 
-            this.progressText = Utility.CreateNotificationText("Finish Initiaraize.");
+            this.StartCoroutine(this.CreateText());
+            
         }
 
         private void FixedUpdate()
         {
-            if (!string.IsNullOrEmpty(progressText.text) && DateTime.Now >= DateTime.Now.AddSeconds(5)) {
+            if (!string.IsNullOrEmpty(progressText?.text) && lastUpdateTime.AddSeconds(5) <= DateTime.Now) {
                 progressText.text = "";
             }
         }
@@ -80,6 +81,13 @@ namespace PlaylistDownLoader
             instance = null; // This MonoBehaviour is being destroyed, so set the static instance property to null.
         }
         #endregion
+
+        private IEnumerator CreateText()
+        {
+            yield return new WaitUntil(() => Resources.FindObjectsOfTypeAll<TMP_FontAsset>().Any(t => t.name == "Teko-Medium SDF No Glow"));
+            this.progressText = Utility.CreateNotificationText("");
+            this.ChengeText("Finish PlaylistDownloader Initiaraize.");
+        }
 
         public async Task CheckPlaylistsSong()
         {
@@ -117,28 +125,37 @@ namespace PlaylistDownLoader
             }
         }
 
+        
+
         private async Task DownloadSong(string hash)
         {
+            ThreadPool.GetMinThreads(out _, out var min);
+            ThreadPool.SetMinThreads(48, min);
+
             var timer = new Stopwatch();
             Beatmap beatmap = null;
             try {
-                await semaphoreSlim.WaitAsync();
+                await semaphoreSlim.WaitAsync().ConfigureAwait(false);
 
                 timer.Start();
-                beatmap = await this.Current.Hash(hash);
+                while (Plugin.IsInGame) {
+                    await Task.Delay(200).ConfigureAwait(false);
+                }
+                beatmap = await this.Current.Hash(hash).ConfigureAwait(false);
                 if (beatmap == null) {
+                    Logger.log.Info($"Beatmap is not find. {hash}");
                     return;
                 }
                 Logger.log.Info($"DownloadedSongInfo : {beatmap.Metadata.SongName} ({timer.ElapsedMilliseconds} ms)");
                 var songDirectoryPath = Path.Combine(_customLevelsDirectory, $"{beatmap.Key}({Regex.Replace(beatmap.Metadata.SongName, "[/:*<>|?\"]", "")} - {Regex.Replace(beatmap.Metadata.SongAuthorName, "[/:*<>|?\"]", "")})");
                 while (Plugin.IsInGame) {
-                    await Task.Delay(200);
+                    await Task.Delay(200).ConfigureAwait(false);
                 }
                 if (File.Exists(songDirectoryPath)) {
                     return;
                 }
 
-                using (var ms = new MemoryStream(await beatmap.DownloadZip()))
+                using (var ms = new MemoryStream(await beatmap.DownloadZip().ConfigureAwait(false)))
                 using (var archive = new ZipArchive(ms, ZipArchiveMode.Read)) {
                     Logger.log.Info($"DownloadedSongZip : {beatmap.Metadata.SongName}  ({timer.ElapsedMilliseconds} ms)");
                     archive.ExtractToDirectory(songDirectoryPath);
@@ -151,8 +168,10 @@ namespace PlaylistDownLoader
                 Logger.log.Error(e);
             }
             finally {
-                timer.Stop();
-                Logger.log.Info($"Downloaded : {beatmap.Metadata.SongName}  ({timer.ElapsedMilliseconds} ms)");
+                if (timer.IsRunning) {
+                    timer.Stop();
+                }
+                Logger.log.Info($"Downloaded : {beatmap?.Metadata.SongName}  ({timer.ElapsedMilliseconds} ms)");
                 semaphoreSlim.Release();
             }
         }
