@@ -181,7 +181,7 @@ namespace PlaylistDownLoader
             yield return new WaitWhile(() => Plugin.IsInGame || Loader.AreSongsLoading);
             Loader.Instance.RefreshSongs(false);
             yield return new WaitWhile(() => Plugin.IsInGame || Loader.AreSongsLoading);
-            PlaylistCollectionOverride.refreshPlaylists();
+            PlaylistCollectionOverride.RefreshPlaylists();
         }
 
         private void ChengeText(string message)
