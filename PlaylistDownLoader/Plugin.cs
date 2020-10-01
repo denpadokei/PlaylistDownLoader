@@ -9,6 +9,7 @@ using UnityEngine.SceneManagement;
 using UnityEngine;
 using IPALogger = IPA.Logging.Logger;
 using BS_Utils.Utilities;
+using IPA.Loader;
 
 namespace PlaylistDownLoader
 {
@@ -57,12 +58,20 @@ namespace PlaylistDownLoader
 
         private async void BSEvents_lateMenuSceneLoadedFresh(ScenesTransitionSetupDataSO obj)
         {
+            if (this.IsInstallSyncSaber()) {
+                return;
+            }
             await PlaylistDownLoaderController.instance.CheckPlaylistsSong();
         }
 
         private void SceneManager_activeSceneChanged(Scene arg0, Scene arg1)
         {
             IsInGame = arg1.name == "GameCore";
+        }
+
+        private bool IsInstallSyncSaber()
+        {
+            return PluginManager.GetPlugin("SyncSaber") != null;
         }
 
         [OnExit]
