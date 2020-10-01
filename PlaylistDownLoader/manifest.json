@@ -3,7 +3,7 @@
   "id": "PlaylistDownLoader",
   "name": "PlaylistDownLoader",
   "author": "denpadokei",
-  "version": "0.1.3",
+  "version": "0.2.0",
   "description": "",
   "gameVersion": "1.11.1",
   "dependsOn": {
