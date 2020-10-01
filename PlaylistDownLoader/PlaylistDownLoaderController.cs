@@ -129,9 +129,6 @@ namespace PlaylistDownLoader
 
         private async Task DownloadSong(string hash)
         {
-            ThreadPool.GetMinThreads(out _, out var min);
-            ThreadPool.SetMinThreads(48, min);
-
             var timer = new Stopwatch();
             Beatmap beatmap = null;
             try {
@@ -147,7 +144,7 @@ namespace PlaylistDownLoader
                     return;
                 }
                 Logger.log.Info($"DownloadedSongInfo : {beatmap.Metadata.SongName} ({timer.ElapsedMilliseconds} ms)");
-                var songDirectoryPath = Path.Combine(_customLevelsDirectory, $"{beatmap.Key}({Regex.Replace(beatmap.Metadata.SongName, "[/:*<>|?\"]", "")} - {Regex.Replace(beatmap.Metadata.SongAuthorName, "[/:*<>|?\"]", "")})");
+                var songDirectoryPath = Path.Combine(_customLevelsDirectory, Regex.Replace($"{beatmap.Key}({beatmap.Metadata.SongName} - {beatmap.Metadata.SongAuthorName})", "[/:*<>|?\"]", "_"));
                 while (Plugin.IsInGame) {
                     await Task.Delay(200).ConfigureAwait(false);
                 }
