@@ -144,7 +144,7 @@ namespace PlaylistDownLoader
                     return;
                 }
                 Logger.log.Info($"DownloadedSongInfo : {beatmap.Metadata.SongName} ({timer.ElapsedMilliseconds} ms)");
-                var songDirectoryPath = Path.Combine(_customLevelsDirectory, Regex.Replace($"{beatmap.Key}({beatmap.Metadata.SongName} - {beatmap.Metadata.SongAuthorName})", "[/:*<>|?\"]", "_"));
+                var songDirectoryPath = Path.Combine(_customLevelsDirectory, Regex.Replace($"{beatmap.Key}({beatmap.Metadata.SongName} - {beatmap.Metadata.SongAuthorName})", "[\\\\/:*<>|?\"]", "_"));
                 while (Plugin.IsInGame) {
                     await Task.Delay(200).ConfigureAwait(false);
                 }
