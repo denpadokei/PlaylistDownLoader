@@ -10,6 +10,8 @@ using UnityEngine;
 using IPALogger = IPA.Logging.Logger;
 using BS_Utils.Utilities;
 using IPA.Loader;
+using SiraUtil.Zenject;
+using PlaylistDownLoader.Installers;
 
 namespace PlaylistDownLoader
 {
@@ -28,11 +30,12 @@ namespace PlaylistDownLoader
         /// [Init] methods that use a Constructor or called before regular methods like InitWithConfig.
         /// Only use [Init] with one Constructor.
         /// </summary>
-        public void Init(IPALogger logger)
+        public void Init(IPALogger logger, Zenjector zenjector)
         {
             instance = this;
             Logger.log = logger;
             Logger.log.Debug("Logger initialized.");
+            zenjector.OnMenu<PlaylistDownloaderInstaller>();
         }
 
         #region BSIPA Config
@@ -52,16 +55,6 @@ namespace PlaylistDownLoader
         {
             Logger.log.Debug("OnApplicationStart");
             SceneManager.activeSceneChanged += this.SceneManager_activeSceneChanged;
-            BSEvents.lateMenuSceneLoadedFresh += this.BSEvents_lateMenuSceneLoadedFresh;
-            new GameObject("PlaylistDownLoaderController").AddComponent<PlaylistDownLoaderController>();
-        }
-
-        private async void BSEvents_lateMenuSceneLoadedFresh(ScenesTransitionSetupDataSO obj)
-        {
-            if (this.IsInstallSyncSaber()) {
-                return;
-            }
-            await PlaylistDownLoaderController.instance.CheckPlaylistsSong();
         }
 
         private void SceneManager_activeSceneChanged(Scene arg0, Scene arg1)

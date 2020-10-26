@@ -18,6 +18,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using TMPro;
 using UnityEngine;
+using Zenject;
 
 namespace PlaylistDownLoader
 {
@@ -31,15 +32,12 @@ namespace PlaylistDownLoader
         private static readonly string _customLevelsDirectory = Path.Combine(Environment.CurrentDirectory, "Beat Saber_Data", "CustomLevels");
         private static readonly HashSet<string> _downloadedSongHash = new HashSet<string>();
         private static readonly SemaphoreSlim semaphoreSlim = new SemaphoreSlim(2, 2);
-        private static DateTime lastUpdateTime;
 
-        private TMP_Text progressText;
+        public event Action<string> ChangeNotificationText;
 
         public bool AnyDownloaded { get; private set; }
 
         public BeatSaver Current { get; private set; }
-
-        public static PlaylistDownLoaderController instance { get; private set; }
 
         #region Monobehaviour Messages
         /// <summary>
@@ -49,43 +47,19 @@ namespace PlaylistDownLoader
         {
             // For this particular MonoBehaviour, we only want one instance to exist at any time, so store a reference to it in a static property
             //   and destroy any that are created while one already exists.
-            if (instance != null) {
-                Logger.log?.Warn($"Instance of {this.GetType().Name} already exists, destroying.");
-                GameObject.DestroyImmediate(this);
-                return;
-            }
-            GameObject.DontDestroyOnLoad(this); // Don't destroy this object on scene changes
-            instance = this;
+            DontDestroyOnLoad(this); // Don't destroy this object on scene changes
+            
             Logger.log?.Debug($"{name}: Awake()");
 
             var httpOption = new HttpOptions() { ApplicationName = "PlaylistDownloader", Version = Assembly.GetExecutingAssembly().GetName().Version, Timeout = new TimeSpan(0, 0, 10), HandleRateLimits = false };
             this.Current = new BeatSaver(httpOption);
-
             this.StartCoroutine(this.CreateText());
-            
-        }
-
-        private void FixedUpdate()
-        {
-            if (!string.IsNullOrEmpty(progressText?.text) && lastUpdateTime.AddSeconds(5) <= DateTime.Now) {
-                progressText.text = "";
-            }
-        }
-
-        /// <summary>
-        /// Called when the script is being destroyed.
-        /// </summary>
-        private void OnDestroy()
-        {
-            Logger.log?.Debug($"{name}: OnDestroy()");
-            instance = null; // This MonoBehaviour is being destroyed, so set the static instance property to null.
         }
         #endregion
 
         private IEnumerator CreateText()
         {
             yield return new WaitUntil(() => Resources.FindObjectsOfTypeAll<TMP_FontAsset>().Any(t => t.name == "Teko-Medium SDF No Glow"));
-            this.progressText = Utility.CreateNotificationText("");
             this.ChengeText("Finish PlaylistDownloader Initiaraize.");
         }
 
@@ -186,9 +160,18 @@ namespace PlaylistDownLoader
             HMMainThreadDispatcher.instance.Enqueue(() =>
             {
                 Logger.log.Info(message);
-                progressText.text = $"PlaylistDownloader - {message}";
-                lastUpdateTime = DateTime.Now;
+                this.ChangeNotificationText?.Invoke($"PlaylistDownloader - {message}");
             });
+        }
+
+        public class PlaylistDownLoaderControllerFactory : IFactory<PlaylistDownLoaderController>
+        {
+            [Inject]
+            DiContainer container;
+            public PlaylistDownLoaderController Create()
+            {
+                return this.container.InstantiateComponentOnNewGameObject<PlaylistDownLoaderController>();
+            }
         }
     }
 }
