@@ -14,9 +14,8 @@ namespace PlaylistDownLoader.Installers
     {
         public override void InstallBindings()
         {
-            this.Container.Bind<PlaylistDownLoaderController.PlaylistDownLoaderControllerFactory>().AsSingle();
+            this.Container.BindInterfacesAndSelfTo<PlaylistDownLoaderController>().FromNewComponentOnNewGameObject("PD").AsSingle();
             this.Container.BindViewController<PlaylistDownloaderViewController>();
-            this.Container.Bind<DownloaderManager>().FromNewComponentOnNewGameObject().AsSingle().NonLazy();
         }
     }
 }

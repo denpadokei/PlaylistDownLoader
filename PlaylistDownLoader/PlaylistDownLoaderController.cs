@@ -1,5 +1,6 @@
 ﻿using BeatSaverSharp;
 using Newtonsoft.Json;
+using PlaylistDownLoader.Interfaces;
 using PlaylistDownLoader.Models;
 using PlaylistDownLoader.Utilites;
 using PlaylistLoaderLite.HarmonyPatches;
@@ -26,7 +27,7 @@ namespace PlaylistDownLoader
     /// Monobehaviours (scripts) are added to GameObjects.
     /// For a full list of Messages a Monobehaviour can receive from the game, see https://docs.unity3d.com/ScriptReference/MonoBehaviour.html.
     /// </summary>
-    public class PlaylistDownLoaderController : MonoBehaviour
+    public class PlaylistDownLoaderController : MonoBehaviour, IPlaylistDownloader
     {
         private static readonly string _playlistsDirectory = Path.Combine(Environment.CurrentDirectory, "Playlists");
         private static readonly string _customLevelsDirectory = Path.Combine(Environment.CurrentDirectory, "Beat Saber_Data", "CustomLevels");
@@ -162,16 +163,6 @@ namespace PlaylistDownLoader
                 Logger.log.Info(message);
                 this.ChangeNotificationText?.Invoke($"PlaylistDownloader - {message}");
             });
-        }
-
-        public class PlaylistDownLoaderControllerFactory : IFactory<PlaylistDownLoaderController>
-        {
-            [Inject]
-            DiContainer container;
-            public PlaylistDownLoaderController Create()
-            {
-                return this.container.InstantiateComponentOnNewGameObject<PlaylistDownLoaderController>();
-            }
         }
     }
 }
