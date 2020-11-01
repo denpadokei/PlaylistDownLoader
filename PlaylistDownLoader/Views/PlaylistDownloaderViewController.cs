@@ -6,7 +6,9 @@ using BeatSaberMarkupLanguage.Attributes;
 using BeatSaberMarkupLanguage.Components;
 using BeatSaberMarkupLanguage.FloatingScreen;
 using BeatSaberMarkupLanguage.ViewControllers;
+using BS_Utils.Utilities;
 using IPA.Loader;
+using PlaylistDownLoader.Interfaces;
 using UnityEngine;
 using Zenject;
 
@@ -32,33 +34,41 @@ namespace PlaylistDownLoader.Views
 
         private FloatingScreen _floatingScreen;
         private DateTime lastUpdateTime;
-        private PlaylistDownLoaderController controller;
-        private PlaylistDownLoaderController.PlaylistDownLoaderControllerFactory _factory;
-
+        private IPlaylistDownloader _controller;
         [Inject]
-        void Constractor(PlaylistDownLoaderController.PlaylistDownLoaderControllerFactory factory)
+        void Constractor(IPlaylistDownloader controller)
         {
-            this._factory = factory;
+            this._controller = controller;
         }
 
-        void FixedUpdate()
+        void Update()
         {
             if (!string.IsNullOrEmpty(this.NotificationText) && lastUpdateTime.AddSeconds(5) <= DateTime.Now) {
                 this.NotificationText = "";
             }
         }
 
-        async void Start()
+        void Awake()
+        {
+            DontDestroyOnLoad(this);
+            BSEvents.lateMenuSceneLoadedFresh += this.BSEvents_lateMenuSceneLoadedFresh;
+        }
+
+        protected override void OnDestroy()
+        {
+            BSEvents.lateMenuSceneLoadedFresh -= this.BSEvents_lateMenuSceneLoadedFresh;
+            base.OnDestroy();
+        }
+
+        private async void BSEvents_lateMenuSceneLoadedFresh(ScenesTransitionSetupDataSO obj)
         {
             if (PluginManager.GetPlugin("SyncSaber") != null) {
                 return;
             }
-            this.controller = this._factory.Create();
-            DontDestroyOnLoad(controller.gameObject);
-            this._floatingScreen = FloatingScreen.CreateFloatingScreen(new Vector2(100f, 30f), false, new Vector3(0f, 0.3f, 2.4f), new Quaternion(0, 0, 0, 0));
+            this._floatingScreen = FloatingScreen.CreateFloatingScreen(new Vector2(100f, 20f), false, new Vector3(0f, 0.3f, 2.8f), new Quaternion(0f, 0f, 0f, 0f));
             this._floatingScreen.SetRootViewController(this, AnimationType.None);
-            this.controller.ChangeNotificationText += this.ChangeNotificationText;
-            await this.controller.CheckPlaylistsSong();
+            this._controller.ChangeNotificationText += this.ChangeNotificationText;
+            await this._controller.CheckPlaylistsSong();
         }
 
         private void ChangeNotificationText(string obj)

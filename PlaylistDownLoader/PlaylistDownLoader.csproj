@@ -152,7 +152,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Installers\PlaylistDownloaderInstaller.cs" />
-    <Compile Include="Models\DownloaderManager.cs" />
+    <Compile Include="Interfaces\IPlaylistDownloader.cs" />
     <Compile Include="Models\PlaylistEntity.cs" />
     <Compile Include="Models\SongEntity.cs" />
     <Compile Include="Plugin.cs" />
@@ -174,9 +174,7 @@
       <DependentUpon>PlaylistDownloaderViewController.cs</DependentUpon>
     </EmbeddedResource>
   </ItemGroup>
-  <ItemGroup>
-    <Folder Include="UI\" />
-  </ItemGroup>
+  <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <Import Project="BuildTargets.targets" />
   <PropertyGroup>
