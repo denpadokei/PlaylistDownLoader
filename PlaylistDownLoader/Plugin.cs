@@ -16,7 +16,7 @@ using PlaylistDownLoader.Installers;
 namespace PlaylistDownLoader
 {
 
-    [Plugin(RuntimeOptions.SingleStartInit)]
+    [Plugin(RuntimeOptions.DynamicInit)]
     public class Plugin
     {
         internal static Plugin instance { get; private set; }
