@@ -1,9 +1,8 @@
-﻿using BeatSaverSharp;
-using Newtonsoft.Json;
+﻿using Newtonsoft.Json;
 using PlaylistDownLoader.Interfaces;
 using PlaylistDownLoader.Models;
+using PlaylistDownLoader.Networks;
 using PlaylistDownLoader.Utilites;
-using PlaylistLoaderLite.HarmonyPatches;
 using SongCore;
 using System;
 using System.Collections;
@@ -13,13 +12,11 @@ using System.IO;
 using System.IO.Compression;
 using System.Linq;
 using System.Reflection;
-using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using TMPro;
 using UnityEngine;
-using Zenject;
 
 namespace PlaylistDownLoader
 {
@@ -38,8 +35,6 @@ namespace PlaylistDownLoader
 
         public bool AnyDownloaded { get; private set; }
 
-        public BeatSaver Current { get; private set; }
-
         #region Monobehaviour Messages
         /// <summary>
         /// Only ever called once, mainly used to initialize variables.
@@ -49,11 +44,8 @@ namespace PlaylistDownLoader
             // For this particular MonoBehaviour, we only want one instance to exist at any time, so store a reference to it in a static property
             //   and destroy any that are created while one already exists.
             DontDestroyOnLoad(this); // Don't destroy this object on scene changes
-            
-            Logger.log?.Debug($"{name}: Awake()");
 
-            var httpOption = new HttpOptions() { ApplicationName = "PlaylistDownloader", Version = Assembly.GetExecutingAssembly().GetName().Version, Timeout = new TimeSpan(0, 0, 10), HandleRateLimits = false };
-            this.Current = new BeatSaver(httpOption);
+            Logger.log?.Debug($"{name}: Awake()");
             this.StartCoroutine(this.CreateText());
         }
         #endregion
@@ -78,7 +70,7 @@ namespace PlaylistDownLoader
             try {
                 foreach (var playlist in playlists.Select(x => JsonConvert.DeserializeObject<PlaylistEntity>(File.ReadAllText(x.FullName)))) {
                     foreach (var song in playlist.songs.Where(x => !string.IsNullOrEmpty(x.hash))) {
-                        while (Plugin.IsInGame) {
+                        while (Plugin.IsInGame || !Loader.AreSongsLoaded || Loader.AreSongsLoading) {
                             await Task.Delay(200);
                         }
                         if (Loader.GetLevelByHash(song.hash.ToUpper()) != null || _downloadedSongHash.Any(x => x == song.hash.ToUpper())) {
@@ -90,8 +82,8 @@ namespace PlaylistDownLoader
                     }
                 }
                 await Task.WhenAll(downloadTask);
-                if (AnyDownloaded) {
-                    StartCoroutine(RefreshSongsAndPlaylists());
+                if (this.AnyDownloaded) {
+                    StartCoroutine(PlaylistManagerUtil.RefreshPlaylist());
                 }
                 ChengeText("Checked PlaylitsSongs");
             }
@@ -100,12 +92,12 @@ namespace PlaylistDownLoader
             }
         }
 
-        
+
 
         private async Task DownloadSong(string hash)
         {
             var timer = new Stopwatch();
-            Beatmap beatmap = null;
+            WebResponse res = null;
             try {
                 await semaphoreSlim.WaitAsync().ConfigureAwait(false);
 
@@ -113,13 +105,19 @@ namespace PlaylistDownLoader
                 while (Plugin.IsInGame) {
                     await Task.Delay(200).ConfigureAwait(false);
                 }
-                beatmap = await this.Current.Hash(hash).ConfigureAwait(false);
-                if (beatmap == null) {
+                res = await WebClient.GetAsync($"https://beatsaver.com/api/maps/by-hash/{hash}", CancellationToken.None);
+                if (!res.IsSuccessStatusCode) {
                     Logger.log.Info($"Beatmap is not find. {hash}");
                     return;
                 }
-                Logger.log.Info($"DownloadedSongInfo : {beatmap.Metadata.SongName} ({timer.ElapsedMilliseconds} ms)");
-                var songDirectoryPath = Path.Combine(_customLevelsDirectory, Regex.Replace($"{beatmap.Key}({beatmap.Metadata.SongName} - {beatmap.Metadata.SongAuthorName})", "[\\\\/:*<>|?\"]", "_"));
+                var json = res.ConvertToJsonNode();
+                if (json == null) {
+                    Logger.log.Info($"Beatmap is not find. {hash}");
+                    return;
+                }
+                var meta = json["metadata"].AsObject;
+                Logger.log.Info($"DownloadedSongInfo : {meta["songName"].Value} ({timer.ElapsedMilliseconds} ms)");
+                var songDirectoryPath = Path.Combine(_customLevelsDirectory, Regex.Replace($"{json["key"].Value}({meta["songName"].Value} - {meta["songAuthorName"].Value})", "[\\\\/:*<>|?\"]", "_"));
                 while (Plugin.IsInGame) {
                     await Task.Delay(200).ConfigureAwait(false);
                 }
@@ -127,13 +125,18 @@ namespace PlaylistDownLoader
                     return;
                 }
 
-                using (var ms = new MemoryStream(await beatmap.DownloadZip().ConfigureAwait(false)))
+                using (var ms = new MemoryStream(await WebClient.DownloadSong($"https://beatsaver.com{json["downloadURL"].Value}", CancellationToken.None)))
                 using (var archive = new ZipArchive(ms, ZipArchiveMode.Read)) {
-                    Logger.log.Info($"DownloadedSongZip : {beatmap.Metadata.SongName}  ({timer.ElapsedMilliseconds} ms)");
-                    archive.ExtractToDirectory(songDirectoryPath);
-                    this.ChengeText($"Downloaded {beatmap.Metadata.SongName}");
+                    Logger.log.Info($"DownloadedSongZip : {meta["songName"].Value}  ({timer.ElapsedMilliseconds} ms)");
+                    try {
+                        archive.ExtractToDirectory(songDirectoryPath);
+                    }
+                    catch (Exception e) {
+                        Logger.Error($"{e}");
+                    }
+                    this.ChengeText($"Downloaded {meta["songName"].Value}");
                 }
-                
+
                 AnyDownloaded = true;
             }
             catch (Exception e) {
@@ -143,19 +146,10 @@ namespace PlaylistDownLoader
                 if (timer.IsRunning) {
                     timer.Stop();
                 }
-                Logger.log.Info($"Downloaded : {beatmap?.Metadata.SongName}  ({timer.ElapsedMilliseconds} ms)");
+                Logger.log.Info($"Downloaded : {res.ConvertToJsonNode()?["name"]}  ({timer.ElapsedMilliseconds} ms)");
                 semaphoreSlim.Release();
             }
         }
-
-        private IEnumerator RefreshSongsAndPlaylists()
-        {
-            yield return new WaitWhile(() => Plugin.IsInGame || Loader.AreSongsLoading);
-            Loader.Instance.RefreshSongs(false);
-            yield return new WaitWhile(() => Plugin.IsInGame || Loader.AreSongsLoading);
-            PlaylistCollectionOverride.RefreshPlaylists();
-        }
-
         private void ChengeText(string message)
         {
             HMMainThreadDispatcher.instance.Enqueue(() =>
