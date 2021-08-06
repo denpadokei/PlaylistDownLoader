@@ -11,8 +11,14 @@ namespace PlaylistDownLoader
 {
     public static class Logger
     {
-        internal static IPA.Logging.Logger log;
-        public static IPA.Logging.Logger IPALogger => log;
+        private static IPA.Logging.Logger log;
+        private static IPA.Logging.Logger IPALogger => log;
+
+        internal static void SetLogger(IPA.Logging.Logger logger)
+        {
+            log = logger;
+        }
+
         public static void Debug(string message, [CallerFilePath] string path = null, [CallerMemberName] string member = null, [CallerLineNumber] int? num = null)
         {
             IPALogger.Debug($"{Path.GetFileName(path)}[{member}({num})] : {message}");

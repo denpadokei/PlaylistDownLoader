@@ -15,7 +15,7 @@ using Zenject;
 namespace PlaylistDownLoader.Views
 {
     [HotReload]
-    internal class PlaylistDownloaderViewController : BSMLAutomaticViewController
+    internal class PlaylistDownloaderViewController : BSMLAutomaticViewController, IInitializable
     {
         /// <summary>説明 を取得、設定</summary>
         private string notificationText_;
@@ -47,20 +47,13 @@ namespace PlaylistDownLoader.Views
                 this.NotificationText = "";
             }
         }
-
-        void Awake()
+        private void ChangeNotificationText(string obj)
         {
-            DontDestroyOnLoad(this);
-            BSEvents.lateMenuSceneLoadedFresh += this.BSEvents_lateMenuSceneLoadedFresh;
+            this.lastUpdateTime = DateTime.Now;
+            this.NotificationText = obj;
         }
 
-        protected override void OnDestroy()
-        {
-            BSEvents.lateMenuSceneLoadedFresh -= this.BSEvents_lateMenuSceneLoadedFresh;
-            base.OnDestroy();
-        }
-
-        private async void BSEvents_lateMenuSceneLoadedFresh(ScenesTransitionSetupDataSO obj)
+        public async void Initialize()
         {
             if (PluginManager.GetPlugin("SyncSaber") != null) {
                 return;
@@ -69,12 +62,6 @@ namespace PlaylistDownLoader.Views
             this._floatingScreen.SetRootViewController(this, AnimationType.None);
             this._controller.ChangeNotificationText += this.ChangeNotificationText;
             await this._controller.CheckPlaylistsSong();
-        }
-
-        private void ChangeNotificationText(string obj)
-        {
-            this.lastUpdateTime = DateTime.Now;
-            this.NotificationText = obj;
         }
     }
 }
