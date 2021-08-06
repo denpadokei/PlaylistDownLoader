@@ -57,6 +57,7 @@ namespace PlaylistDownLoader.Networks
 
         private static readonly int RETRY_COUNT = 5;
         public static readonly System.Random timeWait = new Random();
+        private static readonly SemaphoreSlim semaphore = new SemaphoreSlim(2, 2);
 
         private static void Connect()
         {
@@ -104,9 +105,9 @@ namespace PlaylistDownLoader.Networks
         internal static async Task<byte[]> DownloadSong(string url, CancellationToken token, IProgress<double> progress = null)
         {
             // check if beatsaver url needs to be pre-pended
-            if (!url.StartsWith(@"https://beatsaver.com"))
+            if (!url.StartsWith(@"https://cdn.beatsaver.com"))
             {
-                url = $"https://beatsaver.com{url}";
+                url = $"https://cdn.beatsaver.com{url}";
             }
             try {
                 var response = await SendAsync(HttpMethod.Get, url, token, progress: progress);
@@ -124,10 +125,11 @@ namespace PlaylistDownLoader.Networks
 
         internal static async Task<WebResponse> SendAsync(HttpMethod methodType, string url, CancellationToken token, IProgress<double> progress = null)
         {
-            Logger.Debug($"{methodType.ToString()}: {url}");
+            Logger.Debug($"{methodType}: {url}");
             
             // send request
             try {
+                await semaphore.WaitAsync();
                 HttpResponseMessage resp = null;
                 var retryCount = 0;
                 do {
@@ -142,8 +144,8 @@ namespace PlaylistDownLoader.Networks
                         Logger.Debug($"resp code : {resp.StatusCode}");
                     }
                     catch (Exception e) {
-                        Logger.Debug($"Error : {e}");
-                        Logger.Debug($"{resp?.StatusCode}");
+                        Logger.Error($"Error : {e}");
+                        Logger.Error($"{resp?.StatusCode}");
                     }
                 } while (resp?.StatusCode != HttpStatusCode.NotFound && resp?.IsSuccessStatusCode != true && retryCount <= RETRY_COUNT);
                 
@@ -179,8 +181,11 @@ namespace PlaylistDownLoader.Networks
                 }
             }
             catch (Exception e) {
-                Logger.Debug($"{e}");
+                Logger.Error($"{e}");
                 throw;
+            }
+            finally {
+                semaphore.Release();
             }
         }
     }

@@ -2,6 +2,7 @@
 using PlaylistDownLoader.Interfaces;
 using PlaylistDownLoader.Models;
 using PlaylistDownLoader.Networks;
+using PlaylistDownLoader.SimpleJson;
 using PlaylistDownLoader.Utilites;
 using SongCore;
 using System;
@@ -30,8 +31,12 @@ namespace PlaylistDownLoader
         private static readonly string _customLevelsDirectory = Path.Combine(Environment.CurrentDirectory, "Beat Saber_Data", "CustomLevels");
         private static readonly HashSet<string> _downloadedSongHash = new HashSet<string>();
         private static readonly SemaphoreSlim semaphoreSlim = new SemaphoreSlim(2, 2);
+        private static string MissingSongFilePath = Path.Combine(Environment.CurrentDirectory, "UserData", Plugin.Name, "MissingSongs.json");
 
         public event Action<string> ChangeNotificationText;
+
+        public const string ROOT_URL = "https://beatsaver.com/api";
+        public const string ROOT_DL_URL = "https://cdn.beatsaver.com";
 
         public bool AnyDownloaded { get; private set; }
 
@@ -43,10 +48,21 @@ namespace PlaylistDownLoader
         {
             // For this particular MonoBehaviour, we only want one instance to exist at any time, so store a reference to it in a static property
             //   and destroy any that are created while one already exists.
-            DontDestroyOnLoad(this); // Don't destroy this object on scene changes
+            //DontDestroyOnLoad(this); // Don't destroy this object on scene changes
 
-            Logger.log?.Debug($"{name}: Awake()");
+            Logger.Debug($"{name}: Awake()");
             this.StartCoroutine(this.CreateText());
+            if (!Directory.Exists(Path.GetDirectoryName(MissingSongFilePath))) {
+                Directory.CreateDirectory(Path.GetDirectoryName(MissingSongFilePath));
+            }
+            if (!File.Exists(MissingSongFilePath)) {
+                using (var file = File.Create(MissingSongFilePath)) {
+                    
+                }
+                var json = new JSONObject();
+                json.Add("songs", new JSONArray());
+                File.WriteAllText(MissingSongFilePath, json.ToString());
+            }
         }
         #endregion
 
@@ -88,7 +104,7 @@ namespace PlaylistDownLoader
                 ChengeText("Checked PlaylitsSongs");
             }
             catch (Exception e) {
-                Logger.log.Error(e);
+                Logger.Error(e);
             }
         }
 
@@ -98,6 +114,8 @@ namespace PlaylistDownLoader
         {
             var timer = new Stopwatch();
             WebResponse res = null;
+            var missingJson = JSONObject.Parse(File.ReadAllText(MissingSongFilePath));
+            var array = missingJson["songs"].AsArray;
             try {
                 await semaphoreSlim.WaitAsync().ConfigureAwait(false);
 
@@ -105,29 +123,46 @@ namespace PlaylistDownLoader
                 while (Plugin.IsInGame) {
                     await Task.Delay(200).ConfigureAwait(false);
                 }
-                res = await WebClient.GetAsync($"https://beatsaver.com/api/maps/by-hash/{hash}", CancellationToken.None);
+                if (HistoryManager.Contains(hash)) {
+                    return;
+                }
+                res = await WebClient.GetAsync($"{ROOT_URL}/maps/hash/{hash.ToLower()}", CancellationToken.None);
+                HistoryManager.Add(hash);
                 if (!res.IsSuccessStatusCode) {
-                    Logger.log.Info($"Beatmap is not find. {hash}");
+                    Logger.Info($"Beatmap is not find. {hash}");
+                    array.Add(hash);
                     return;
                 }
                 var json = res.ConvertToJsonNode();
                 if (json == null) {
-                    Logger.log.Info($"Beatmap is not find. {hash}");
+                    Logger.Info($"Beatmap is not find. {hash}");
+                    array.Add(hash);
                     return;
                 }
                 var meta = json["metadata"].AsObject;
-                Logger.log.Info($"DownloadedSongInfo : {meta["songName"].Value} ({timer.ElapsedMilliseconds} ms)");
-                var songDirectoryPath = Path.Combine(_customLevelsDirectory, Regex.Replace($"{json["key"].Value}({meta["songName"].Value} - {meta["songAuthorName"].Value})", "[\\\\/:*<>|?\"]", "_"));
+                Logger.Info($"DownloadedSongInfo : {meta["songName"].Value} ({timer.ElapsedMilliseconds} ms)");                
+                var version = json["versions"].AsArray.Children.FirstOrDefault(x => string.Equals(x["state"].Value, "Published", StringComparison.InvariantCultureIgnoreCase));
+                if (version == null) {
+                    Logger.Debug("this map is not published.");
+                    // 後でパブリッシュになったらDLできるように外しておく。
+                    HistoryManager.Remove(hash);
+                    return;
+                }
+                var key = json["id"].Value;
+                var songDirectoryPath = Path.Combine(_customLevelsDirectory, Regex.Replace($"{key} ({meta["songName"].Value} - {meta["songAuthorName"].Value})", "[\\\\/:*<>|?\"]", "_"));
                 while (Plugin.IsInGame) {
                     await Task.Delay(200).ConfigureAwait(false);
                 }
                 if (File.Exists(songDirectoryPath)) {
                     return;
                 }
-
-                using (var ms = new MemoryStream(await WebClient.DownloadSong($"https://beatsaver.com{json["downloadURL"].Value}", CancellationToken.None)))
+                var dlurl = version.AsObject["downloadURL"].Value;
+                if (string.IsNullOrEmpty(dlurl)) {
+                    dlurl = $"{ROOT_DL_URL}/{hash.ToLower()}.zip";
+                }
+                using (var ms = new MemoryStream(await WebClient.DownloadSong($"{dlurl}", CancellationToken.None)))
                 using (var archive = new ZipArchive(ms, ZipArchiveMode.Read)) {
-                    Logger.log.Info($"DownloadedSongZip : {meta["songName"].Value}  ({timer.ElapsedMilliseconds} ms)");
+                    Logger.Info($"DownloadedSongZip : {meta["songName"].Value}  ({timer.ElapsedMilliseconds} ms)");
                     try {
                         archive.ExtractToDirectory(songDirectoryPath);
                     }
@@ -140,13 +175,14 @@ namespace PlaylistDownLoader
                 AnyDownloaded = true;
             }
             catch (Exception e) {
-                Logger.log.Error(e);
+                Logger.Error(e);
             }
             finally {
+                HistoryManager.Save();
                 if (timer.IsRunning) {
                     timer.Stop();
                 }
-                Logger.log.Info($"Downloaded : {res.ConvertToJsonNode()?["name"]}  ({timer.ElapsedMilliseconds} ms)");
+                Logger.Info($"Downloaded : {res.ConvertToJsonNode()?["name"]}  ({timer.ElapsedMilliseconds} ms)");
                 semaphoreSlim.Release();
             }
         }
@@ -154,7 +190,7 @@ namespace PlaylistDownLoader
         {
             HMMainThreadDispatcher.instance.Enqueue(() =>
             {
-                Logger.log.Info(message);
+                Logger.Info(message);
                 this.ChangeNotificationText?.Invoke($"PlaylistDownloader - {message}");
             });
         }

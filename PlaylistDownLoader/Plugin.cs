@@ -33,8 +33,8 @@ namespace PlaylistDownLoader
         public void Init(IPALogger logger, Zenjector zenjector)
         {
             instance = this;
-            Logger.log = logger;
-            Logger.log.Debug("Logger initialized.");
+            Logger.SetLogger(logger);
+            Logger.Debug("Logger initialized.");
             zenjector.OnMenu<PlaylistDownloaderInstaller>();
         }
 
@@ -53,7 +53,7 @@ namespace PlaylistDownLoader
         [OnStart]
         public void OnApplicationStart()
         {
-            Logger.log.Debug("OnApplicationStart");
+            Logger.Debug("OnApplicationStart");
             SceneManager.activeSceneChanged += this.SceneManager_activeSceneChanged;
         }
 
@@ -70,7 +70,7 @@ namespace PlaylistDownLoader
         [OnExit]
         public void OnApplicationQuit()
         {
-            Logger.log.Debug("OnApplicationQuit");
+            Logger.Debug("OnApplicationQuit");
             SceneManager.activeSceneChanged -= this.SceneManager_activeSceneChanged;
         }
     }
