@@ -31,7 +31,6 @@ namespace PlaylistDownLoader
         private static readonly string _customLevelsDirectory = Path.Combine(Environment.CurrentDirectory, "Beat Saber_Data", "CustomLevels");
         private static readonly HashSet<string> _downloadedSongHash = new HashSet<string>();
         private static readonly SemaphoreSlim semaphoreSlim = new SemaphoreSlim(2, 2);
-        private static string MissingSongFilePath = Path.Combine(Environment.CurrentDirectory, "UserData", Plugin.Name, "MissingSongs.json");
 
         public event Action<string> ChangeNotificationText;
 
@@ -52,17 +51,6 @@ namespace PlaylistDownLoader
 
             Logger.Debug($"{name}: Awake()");
             this.StartCoroutine(this.CreateText());
-            if (!Directory.Exists(Path.GetDirectoryName(MissingSongFilePath))) {
-                Directory.CreateDirectory(Path.GetDirectoryName(MissingSongFilePath));
-            }
-            if (!File.Exists(MissingSongFilePath)) {
-                using (var file = File.Create(MissingSongFilePath)) {
-                    
-                }
-                var json = new JSONObject();
-                json.Add("songs", new JSONArray());
-                File.WriteAllText(MissingSongFilePath, json.ToString());
-            }
         }
         #endregion
 
@@ -114,8 +102,6 @@ namespace PlaylistDownLoader
         {
             var timer = new Stopwatch();
             WebResponse res = null;
-            var missingJson = JSONObject.Parse(File.ReadAllText(MissingSongFilePath));
-            var array = missingJson["songs"].AsArray;
             try {
                 await semaphoreSlim.WaitAsync().ConfigureAwait(false);
 
@@ -130,13 +116,11 @@ namespace PlaylistDownLoader
                 HistoryManager.Add(hash);
                 if (!res.IsSuccessStatusCode) {
                     Logger.Info($"Beatmap is not find. {hash}");
-                    array.Add(hash);
                     return;
                 }
                 var json = res.ConvertToJsonNode();
                 if (json == null) {
                     Logger.Info($"Beatmap is not find. {hash}");
-                    array.Add(hash);
                     return;
                 }
                 var meta = json["metadata"].AsObject;
