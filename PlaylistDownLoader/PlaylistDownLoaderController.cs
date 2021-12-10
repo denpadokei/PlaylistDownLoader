@@ -133,7 +133,7 @@ namespace PlaylistDownLoader
                     return;
                 }
                 var key = json["id"].Value;
-                var songDirectoryPath = Path.Combine(_customLevelsDirectory, Regex.Replace($"{key} ({meta["songName"].Value} - {meta["songAuthorName"].Value})", "[\\\\/:*<>|?\"]", "_"));
+                var songDirectoryPath = this.CreateSongDirectory(json);
                 while (Plugin.IsInGame) {
                     await Task.Delay(200).ConfigureAwait(false);
                 }
@@ -177,6 +177,20 @@ namespace PlaylistDownLoader
                 Logger.Info(message);
                 this.ChangeNotificationText?.Invoke($"PlaylistDownloader - {message}");
             });
+        }
+
+        private string CreateSongDirectory(JSONNode songNode)
+        {
+            var metaData = songNode["metadata"].AsObject;
+            var songIndex = Regex.Replace($"{songNode["id"].Value} ({metaData["songName"].Value} - {metaData["levelAuthorName"].Value})", "[\\\\:*/?\"<>|]", "_");
+            var result = Path.Combine(Environment.CurrentDirectory, "Beat Saber_Data", "CustomLevels", songIndex);
+            var count = 1;
+            var resultLength = result.Length;
+            while (Directory.Exists(result)) {
+                result = $"{result.Substring(0, resultLength)}({count})";
+                count++;
+            }
+            return result;
         }
     }
 }

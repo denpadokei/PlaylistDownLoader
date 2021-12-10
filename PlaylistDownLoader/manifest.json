@@ -3,13 +3,13 @@
   "id": "PlaylistDownLoader",
   "name": "PlaylistDownLoader",
   "author": "denpadokei",
-  "version": "1.2.0",
+  "version": "2.0.0",
   "description": "",
-  "gameVersion": "1.16.4",
+  "gameVersion": "1.19.0",
   "dependsOn": {
     "BSIPA": "^4.2.0",
     "SongCore": "^3.5.0",
-    "SiraUtil": "^2.5.7",
+    "SiraUtil": "^3.0.0",
     "BS Utils": "^1.11.0",
     "BeatSaberPlaylistsLib": "^1.4.0",
     "PlaylistManager": "^1.2.0"

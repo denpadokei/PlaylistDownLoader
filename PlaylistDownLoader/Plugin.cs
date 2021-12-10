@@ -35,7 +35,7 @@ namespace PlaylistDownLoader
             instance = this;
             Logger.SetLogger(logger);
             Logger.Debug("Logger initialized.");
-            zenjector.OnMenu<PlaylistDownloaderInstaller>();
+            zenjector.Install<PlaylistDownloaderInstaller>(Location.Menu);
         }
 
         #region BSIPA Config
