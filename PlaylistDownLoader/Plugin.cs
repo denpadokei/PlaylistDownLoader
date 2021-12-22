@@ -54,7 +54,19 @@ namespace PlaylistDownLoader
         public void OnApplicationStart()
         {
             Logger.Debug("OnApplicationStart");
+            
+        }
+
+        [OnEnable]
+        public void OnEnable()
+        {
             SceneManager.activeSceneChanged += this.SceneManager_activeSceneChanged;
+        }
+
+        [OnDisable]
+        public void OnDisable()
+        {
+            SceneManager.activeSceneChanged -= this.SceneManager_activeSceneChanged;
         }
 
         private void SceneManager_activeSceneChanged(Scene arg0, Scene arg1)
@@ -71,7 +83,6 @@ namespace PlaylistDownLoader
         public void OnApplicationQuit()
         {
             Logger.Debug("OnApplicationQuit");
-            SceneManager.activeSceneChanged -= this.SceneManager_activeSceneChanged;
         }
     }
 }
