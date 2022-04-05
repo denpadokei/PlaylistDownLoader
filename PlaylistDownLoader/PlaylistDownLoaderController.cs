@@ -34,7 +34,7 @@ namespace PlaylistDownLoader
 
         public event Action<string> ChangeNotificationText;
 
-        public const string ROOT_URL = "https://beatsaver.com/api";
+        public const string ROOT_URL = "https://api.beatsaver.com";
         public const string ROOT_DL_URL = "https://cdn.beatsaver.com";
 
         public bool AnyDownloaded { get; private set; }
