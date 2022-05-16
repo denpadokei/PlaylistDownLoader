@@ -1,5 +1,4 @@
-﻿using PlaylistDownLoader;
-using PlaylistDownLoader.SimpleJson;
+﻿using PlaylistDownLoader.SimpleJson;
 using System;
 using System.IO;
 using System.Net;
@@ -23,20 +22,28 @@ namespace PlaylistDownLoader.Networks
 
         internal WebResponse(HttpResponseMessage resp, byte[] body)
         {
-            StatusCode = resp.StatusCode;
-            ReasonPhrase = resp.ReasonPhrase;
-            Headers = resp.Headers;
-            RequestMessage = resp.RequestMessage;
-            IsSuccessStatusCode = resp.IsSuccessStatusCode;
+            this.StatusCode = resp.StatusCode;
+            this.ReasonPhrase = resp.ReasonPhrase;
+            this.Headers = resp.Headers;
+            this.RequestMessage = resp.RequestMessage;
+            this.IsSuccessStatusCode = resp.IsSuccessStatusCode;
 
-            _content = body;
+            this._content = body;
         }
 
-        public byte[] ContentToBytes() => _content;
-        public string ContentToString() => Encoding.UTF8.GetString(_content);
+        public byte[] ContentToBytes()
+        {
+            return this._content;
+        }
+
+        public string ContentToString()
+        {
+            return Encoding.UTF8.GetString(this._content);
+        }
+
         public JSONNode ConvertToJsonNode()
         {
-            return JSONNode.Parse(ContentToString());
+            return JSONNode.Parse(this.ContentToString());
         }
     }
 
@@ -67,7 +74,7 @@ namespace PlaylistDownLoader.Networks
             catch (Exception e) {
                 Logger.Debug($"{e}");
             }
-            
+
 
             _client = new HttpClient()
             {
@@ -122,7 +129,7 @@ namespace PlaylistDownLoader.Networks
         internal static async Task<WebResponse> SendAsync(HttpMethod methodType, string url, CancellationToken token, IProgress<double> progress = null)
         {
             Logger.Debug($"{methodType}: {url}");
-            
+
             // send request
             try {
                 await semaphore.WaitAsync();
@@ -144,26 +151,30 @@ namespace PlaylistDownLoader.Networks
                         Logger.Error($"{resp?.StatusCode}");
                     }
                 } while (resp?.StatusCode != HttpStatusCode.NotFound && resp?.IsSuccessStatusCode != true && retryCount <= RETRY_COUNT);
-                
 
-                if (token.IsCancellationRequested) throw new TaskCanceledException();
+
+                if (token.IsCancellationRequested) {
+                    throw new TaskCanceledException();
+                }
 
                 using (var memoryStream = new MemoryStream())
                 using (var stream = await resp.Content.ReadAsStreamAsync().ConfigureAwait(false)) {
                     var buffer = new byte[8192];
                     var bytesRead = 0; ;
 
-                    long? contentLength = resp?.Content.Headers.ContentLength;
+                    var contentLength = resp?.Content.Headers.ContentLength;
                     var totalRead = 0;
 
                     // send report
                     progress?.Report(0);
 
                     while ((bytesRead = await stream.ReadAsync(buffer, 0, buffer.Length).ConfigureAwait(false)) > 0) {
-                        if (token.IsCancellationRequested) throw new TaskCanceledException();
+                        if (token.IsCancellationRequested) {
+                            throw new TaskCanceledException();
+                        }
 
                         if (contentLength != null) {
-                            progress?.Report((double)totalRead / (double)contentLength);
+                            progress?.Report(totalRead / (double)contentLength);
                         }
 
                         await memoryStream.WriteAsync(buffer, 0, bytesRead).ConfigureAwait(false);
@@ -171,7 +182,7 @@ namespace PlaylistDownLoader.Networks
                     }
 
                     progress?.Report(1);
-                    byte[] bytes = memoryStream.ToArray();
+                    var bytes = memoryStream.ToArray();
 
                     return new WebResponse(resp, bytes);
                 }

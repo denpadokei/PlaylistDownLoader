@@ -1,14 +1,9 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using BeatSaberMarkupLanguage;
-using BeatSaberMarkupLanguage.Attributes;
-using BeatSaberMarkupLanguage.Components;
+﻿using BeatSaberMarkupLanguage.Attributes;
 using BeatSaberMarkupLanguage.FloatingScreen;
 using BeatSaberMarkupLanguage.ViewControllers;
-using BS_Utils.Utilities;
 using IPA.Loader;
 using PlaylistDownLoader.Interfaces;
+using System;
 using UnityEngine;
 using Zenject;
 
@@ -36,14 +31,14 @@ namespace PlaylistDownLoader.Views
         private DateTime lastUpdateTime;
         private IPlaylistDownloader _controller;
         [Inject]
-        void Constractor(IPlaylistDownloader controller)
+        private void Constractor(IPlaylistDownloader controller)
         {
             this._controller = controller;
         }
 
-        void Update()
+        private void Update()
         {
-            if (!string.IsNullOrEmpty(this.NotificationText) && lastUpdateTime.AddSeconds(5) <= DateTime.Now) {
+            if (!string.IsNullOrEmpty(this.NotificationText) && this.lastUpdateTime.AddSeconds(5) <= DateTime.Now) {
                 this.NotificationText = "";
             }
         }

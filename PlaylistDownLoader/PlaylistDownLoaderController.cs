@@ -12,7 +12,6 @@ using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
-using System.Reflection;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
@@ -31,6 +30,7 @@ namespace PlaylistDownLoader
         private static readonly string _customLevelsDirectory = Path.Combine(Environment.CurrentDirectory, "Beat Saber_Data", "CustomLevels");
         private static readonly HashSet<string> _downloadedSongHash = new HashSet<string>();
         private static readonly SemaphoreSlim semaphoreSlim = new SemaphoreSlim(2, 2);
+        private static readonly Regex s_invalidDirectoryAndFileChars = new Regex($@"[{Regex.Escape(new string(Path.GetInvalidFileNameChars()) + new string(Path.GetInvalidPathChars()))}]");
 
         public event Action<string> ChangeNotificationText;
 
@@ -49,7 +49,7 @@ namespace PlaylistDownLoader
             //   and destroy any that are created while one already exists.
             //DontDestroyOnLoad(this); // Don't destroy this object on scene changes
 
-            Logger.Debug($"{name}: Awake()");
+            Logger.Debug($"{this.name}: Awake()");
             this.StartCoroutine(this.CreateText());
         }
         #endregion
@@ -66,9 +66,9 @@ namespace PlaylistDownLoader
                 await Task.Delay(200);
             }
 
-            AnyDownloaded = false;
-            List<FileInfo> playlists = new List<FileInfo>();
-            List<Task> downloadTask = new List<Task>();
+            this.AnyDownloaded = false;
+            var playlists = new List<FileInfo>();
+            var downloadTask = new List<Task>();
             playlists.AddRange(Directory.EnumerateFiles(_playlistsDirectory, "*.json").Select(x => new FileInfo(x)));
             playlists.AddRange(Directory.EnumerateFiles(_playlistsDirectory, "*.bplist").Select(x => new FileInfo(x)));
             try {
@@ -87,9 +87,9 @@ namespace PlaylistDownLoader
                 }
                 await Task.WhenAll(downloadTask);
                 if (this.AnyDownloaded) {
-                    StartCoroutine(PlaylistManagerUtil.RefreshPlaylist());
+                    this.StartCoroutine(PlaylistManagerUtil.RefreshPlaylist());
                 }
-                ChengeText("Checked PlaylitsSongs");
+                this.ChengeText("Checked PlaylitsSongs");
             }
             catch (Exception e) {
                 Logger.Error(e);
@@ -124,7 +124,7 @@ namespace PlaylistDownLoader
                     return;
                 }
                 var meta = json["metadata"].AsObject;
-                Logger.Info($"DownloadedSongInfo : {meta["songName"].Value} ({timer.ElapsedMilliseconds} ms)");                
+                Logger.Info($"DownloadedSongInfo : {meta["songName"].Value} ({timer.ElapsedMilliseconds} ms)");
                 var version = json["versions"].AsArray.Children.FirstOrDefault(x => string.Equals(x["state"].Value, "Published", StringComparison.InvariantCultureIgnoreCase));
                 if (version == null) {
                     Logger.Debug("this map is not published.");
@@ -156,7 +156,7 @@ namespace PlaylistDownLoader
                     this.ChengeText($"Downloaded {meta["songName"].Value}");
                 }
 
-                AnyDownloaded = true;
+                this.AnyDownloaded = true;
             }
             catch (Exception e) {
                 Logger.Error(e);
@@ -182,7 +182,7 @@ namespace PlaylistDownLoader
         private string CreateSongDirectory(JSONNode songNode)
         {
             var metaData = songNode["metadata"].AsObject;
-            var songIndex = Regex.Replace($"{songNode["id"].Value} ({metaData["songName"].Value} - {metaData["levelAuthorName"].Value})", "[\\\\:*/?\"<>|]", "_");
+            var songIndex = s_invalidDirectoryAndFileChars.Replace($"{songNode["id"].Value} ({metaData["songName"].Value} - {metaData["levelAuthorName"].Value})", "_");
             var result = Path.Combine(Environment.CurrentDirectory, "Beat Saber_Data", "CustomLevels", songIndex);
             var count = 1;
             var resultLength = result.Length;

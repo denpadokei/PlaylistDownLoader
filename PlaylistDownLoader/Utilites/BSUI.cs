@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using System.Linq;
 using TMPro;
 using UnityEngine;
 
@@ -20,10 +16,10 @@ namespace PlaylistDownLoader.Utilites
         /// <returns>The newly created TextMeshProUGUI component.</returns>
         public static TextMeshProUGUI CreateText(RectTransform parent, string text, Vector2 anchoredPosition, Vector2 sizeDelta)
         {
-            GameObject gameObj = new GameObject("CustomUIText");
+            var gameObj = new GameObject("CustomUIText");
             gameObj.SetActive(false);
 
-            TextMeshProUGUI textMesh = gameObj.AddComponent<TextMeshProUGUI>();
+            var textMesh = gameObj.AddComponent<TextMeshProUGUI>();
             textMesh.font = Instantiate(Resources.FindObjectsOfTypeAll<TMP_FontAsset>().First(t => t.name == "Teko-Medium SDF No Glow"));
             textMesh.rectTransform.SetParent(parent, false);
             textMesh.text = text;
