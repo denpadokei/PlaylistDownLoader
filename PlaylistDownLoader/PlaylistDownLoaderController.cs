@@ -26,16 +26,18 @@ namespace PlaylistDownLoader
     /// </summary>
     public class PlaylistDownLoaderController : MonoBehaviour, IPlaylistDownloader
     {
-        private static readonly string _playlistsDirectory = Path.Combine(Environment.CurrentDirectory, "Playlists");
-        private static readonly string _customLevelsDirectory = Path.Combine(Environment.CurrentDirectory, "Beat Saber_Data", "CustomLevels");
-        private static readonly HashSet<string> _downloadedSongHash = new HashSet<string>();
-        private static readonly SemaphoreSlim semaphoreSlim = new SemaphoreSlim(2, 2);
+        private static readonly string s_playlistsDirectory = Path.Combine(Environment.CurrentDirectory, "Playlists");
+        //private static readonly string s_customLevelsDirectory = Path.Combine(Environment.CurrentDirectory, "Beat Saber_Data", "CustomLevels");
+        private static readonly HashSet<string> s_downloadedSongHash = new HashSet<string>();
+        private static readonly SemaphoreSlim s_semaphoreSlim = new SemaphoreSlim(2, 2);
         private static readonly Regex s_invalidDirectoryAndFileChars = new Regex($@"[{Regex.Escape(new string(Path.GetInvalidFileNameChars()) + new string(Path.GetInvalidPathChars()))}]");
 
         public event Action<string> ChangeNotificationText;
 
+#pragma warning disable IDE1006 // 命名スタイル
         public const string ROOT_URL = "https://api.beatsaver.com";
         public const string ROOT_DL_URL = "https://cdn.beatsaver.com";
+#pragma warning restore IDE1006 // 命名スタイル
 
         public bool AnyDownloaded { get; private set; }
 
@@ -43,7 +45,7 @@ namespace PlaylistDownLoader
         /// <summary>
         /// Only ever called once, mainly used to initialize variables.
         /// </summary>
-        private void Awake()
+        protected void Awake()
         {
             // For this particular MonoBehaviour, we only want one instance to exist at any time, so store a reference to it in a static property
             //   and destroy any that are created while one already exists.
@@ -69,20 +71,20 @@ namespace PlaylistDownLoader
             this.AnyDownloaded = false;
             var playlists = new List<FileInfo>();
             var downloadTask = new List<Task>();
-            playlists.AddRange(Directory.EnumerateFiles(_playlistsDirectory, "*.json").Select(x => new FileInfo(x)));
-            playlists.AddRange(Directory.EnumerateFiles(_playlistsDirectory, "*.bplist").Select(x => new FileInfo(x)));
+            playlists.AddRange(Directory.EnumerateFiles(s_playlistsDirectory, "*.json").Select(x => new FileInfo(x)));
+            playlists.AddRange(Directory.EnumerateFiles(s_playlistsDirectory, "*.bplist").Select(x => new FileInfo(x)));
             try {
                 foreach (var playlist in playlists.Select(x => JsonConvert.DeserializeObject<PlaylistEntity>(File.ReadAllText(x.FullName)))) {
                     foreach (var song in playlist.songs.Where(x => !string.IsNullOrEmpty(x.hash))) {
                         while (Plugin.IsInGame || !Loader.AreSongsLoaded || Loader.AreSongsLoading) {
                             await Task.Delay(200);
                         }
-                        if (Loader.GetLevelByHash(song.hash.ToUpper()) != null || _downloadedSongHash.Any(x => x == song.hash.ToUpper())) {
-                            _downloadedSongHash.Add(song.hash.ToUpper());
+                        if (Loader.GetLevelByHash(song.hash.ToUpper()) != null || s_downloadedSongHash.Any(x => x == song.hash.ToUpper())) {
+                            s_downloadedSongHash.Add(song.hash.ToUpper());
                             continue;
                         }
                         downloadTask.Add(this.DownloadSong(song.hash));
-                        _downloadedSongHash.Add(song.hash.ToUpper());
+                        s_downloadedSongHash.Add(song.hash.ToUpper());
                     }
                 }
                 await Task.WhenAll(downloadTask);
@@ -103,7 +105,7 @@ namespace PlaylistDownLoader
             var timer = new Stopwatch();
             WebResponse res = null;
             try {
-                await semaphoreSlim.WaitAsync().ConfigureAwait(false);
+                await s_semaphoreSlim.WaitAsync().ConfigureAwait(false);
 
                 timer.Start();
                 while (Plugin.IsInGame) {
@@ -167,7 +169,7 @@ namespace PlaylistDownLoader
                     timer.Stop();
                 }
                 Logger.Info($"Downloaded : {res.ConvertToJsonNode()?["name"]}  ({timer.ElapsedMilliseconds} ms)");
-                semaphoreSlim.Release();
+                s_semaphoreSlim.Release();
             }
         }
         private void ChengeText(string message)
