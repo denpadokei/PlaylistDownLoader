@@ -1,17 +1,9 @@
-﻿using System;
-using System.Collections;
-using System.Collections.Generic;
-using System.Linq;
-using IPA;
-using IPA.Config;
-using IPA.Config.Stores;
-using UnityEngine.SceneManagement;
-using UnityEngine;
-using IPALogger = IPA.Logging.Logger;
-using BS_Utils.Utilities;
+﻿using IPA;
 using IPA.Loader;
-using SiraUtil.Zenject;
 using PlaylistDownLoader.Installers;
+using SiraUtil.Zenject;
+using UnityEngine.SceneManagement;
+using IPALogger = IPA.Logging.Logger;
 
 namespace PlaylistDownLoader
 {
@@ -54,7 +46,7 @@ namespace PlaylistDownLoader
         public void OnApplicationStart()
         {
             Logger.Debug("OnApplicationStart");
-            
+
         }
 
         [OnEnable]

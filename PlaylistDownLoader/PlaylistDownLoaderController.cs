@@ -12,7 +12,6 @@ using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
-using System.Reflection;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
@@ -27,15 +26,18 @@ namespace PlaylistDownLoader
     /// </summary>
     public class PlaylistDownLoaderController : MonoBehaviour, IPlaylistDownloader
     {
-        private static readonly string _playlistsDirectory = Path.Combine(Environment.CurrentDirectory, "Playlists");
-        private static readonly string _customLevelsDirectory = Path.Combine(Environment.CurrentDirectory, "Beat Saber_Data", "CustomLevels");
-        private static readonly HashSet<string> _downloadedSongHash = new HashSet<string>();
-        private static readonly SemaphoreSlim semaphoreSlim = new SemaphoreSlim(2, 2);
+        private static readonly string s_playlistsDirectory = Path.Combine(Environment.CurrentDirectory, "Playlists");
+        //private static readonly string s_customLevelsDirectory = Path.Combine(Environment.CurrentDirectory, "Beat Saber_Data", "CustomLevels");
+        private static readonly HashSet<string> s_downloadedSongHash = new HashSet<string>();
+        private static readonly SemaphoreSlim s_semaphoreSlim = new SemaphoreSlim(2, 2);
+        private static readonly Regex s_invalidDirectoryAndFileChars = new Regex($@"[{Regex.Escape(new string(Path.GetInvalidFileNameChars()) + new string(Path.GetInvalidPathChars()))}]");
 
         public event Action<string> ChangeNotificationText;
 
+#pragma warning disable IDE1006 // 命名スタイル
         public const string ROOT_URL = "https://api.beatsaver.com";
         public const string ROOT_DL_URL = "https://cdn.beatsaver.com";
+#pragma warning restore IDE1006 // 命名スタイル
 
         public bool AnyDownloaded { get; private set; }
 
@@ -43,13 +45,13 @@ namespace PlaylistDownLoader
         /// <summary>
         /// Only ever called once, mainly used to initialize variables.
         /// </summary>
-        private void Awake()
+        protected void Awake()
         {
             // For this particular MonoBehaviour, we only want one instance to exist at any time, so store a reference to it in a static property
             //   and destroy any that are created while one already exists.
             //DontDestroyOnLoad(this); // Don't destroy this object on scene changes
 
-            Logger.Debug($"{name}: Awake()");
+            Logger.Debug($"{this.name}: Awake()");
             this.StartCoroutine(this.CreateText());
         }
         #endregion
@@ -66,30 +68,30 @@ namespace PlaylistDownLoader
                 await Task.Delay(200);
             }
 
-            AnyDownloaded = false;
-            List<FileInfo> playlists = new List<FileInfo>();
-            List<Task> downloadTask = new List<Task>();
-            playlists.AddRange(Directory.EnumerateFiles(_playlistsDirectory, "*.json").Select(x => new FileInfo(x)));
-            playlists.AddRange(Directory.EnumerateFiles(_playlistsDirectory, "*.bplist").Select(x => new FileInfo(x)));
+            this.AnyDownloaded = false;
+            var playlists = new List<FileInfo>();
+            var downloadTask = new List<Task>();
+            playlists.AddRange(Directory.EnumerateFiles(s_playlistsDirectory, "*.json").Select(x => new FileInfo(x)));
+            playlists.AddRange(Directory.EnumerateFiles(s_playlistsDirectory, "*.bplist").Select(x => new FileInfo(x)));
             try {
                 foreach (var playlist in playlists.Select(x => JsonConvert.DeserializeObject<PlaylistEntity>(File.ReadAllText(x.FullName)))) {
                     foreach (var song in playlist.songs.Where(x => !string.IsNullOrEmpty(x.hash))) {
                         while (Plugin.IsInGame || !Loader.AreSongsLoaded || Loader.AreSongsLoading) {
                             await Task.Delay(200);
                         }
-                        if (Loader.GetLevelByHash(song.hash.ToUpper()) != null || _downloadedSongHash.Any(x => x == song.hash.ToUpper())) {
-                            _downloadedSongHash.Add(song.hash.ToUpper());
+                        if (Loader.GetLevelByHash(song.hash.ToUpper()) != null || s_downloadedSongHash.Any(x => x == song.hash.ToUpper())) {
+                            s_downloadedSongHash.Add(song.hash.ToUpper());
                             continue;
                         }
                         downloadTask.Add(this.DownloadSong(song.hash));
-                        _downloadedSongHash.Add(song.hash.ToUpper());
+                        s_downloadedSongHash.Add(song.hash.ToUpper());
                     }
                 }
                 await Task.WhenAll(downloadTask);
                 if (this.AnyDownloaded) {
-                    StartCoroutine(PlaylistManagerUtil.RefreshPlaylist());
+                    this.StartCoroutine(PlaylistManagerUtil.RefreshPlaylist());
                 }
-                ChengeText("Checked PlaylitsSongs");
+                this.ChengeText("Checked PlaylitsSongs");
             }
             catch (Exception e) {
                 Logger.Error(e);
@@ -103,7 +105,7 @@ namespace PlaylistDownLoader
             var timer = new Stopwatch();
             WebResponse res = null;
             try {
-                await semaphoreSlim.WaitAsync().ConfigureAwait(false);
+                await s_semaphoreSlim.WaitAsync().ConfigureAwait(false);
 
                 timer.Start();
                 while (Plugin.IsInGame) {
@@ -124,7 +126,7 @@ namespace PlaylistDownLoader
                     return;
                 }
                 var meta = json["metadata"].AsObject;
-                Logger.Info($"DownloadedSongInfo : {meta["songName"].Value} ({timer.ElapsedMilliseconds} ms)");                
+                Logger.Info($"DownloadedSongInfo : {meta["songName"].Value} ({timer.ElapsedMilliseconds} ms)");
                 var version = json["versions"].AsArray.Children.FirstOrDefault(x => string.Equals(x["state"].Value, "Published", StringComparison.InvariantCultureIgnoreCase));
                 if (version == null) {
                     Logger.Debug("this map is not published.");
@@ -156,7 +158,7 @@ namespace PlaylistDownLoader
                     this.ChengeText($"Downloaded {meta["songName"].Value}");
                 }
 
-                AnyDownloaded = true;
+                this.AnyDownloaded = true;
             }
             catch (Exception e) {
                 Logger.Error(e);
@@ -167,7 +169,7 @@ namespace PlaylistDownLoader
                     timer.Stop();
                 }
                 Logger.Info($"Downloaded : {res.ConvertToJsonNode()?["name"]}  ({timer.ElapsedMilliseconds} ms)");
-                semaphoreSlim.Release();
+                s_semaphoreSlim.Release();
             }
         }
         private void ChengeText(string message)
@@ -182,7 +184,7 @@ namespace PlaylistDownLoader
         private string CreateSongDirectory(JSONNode songNode)
         {
             var metaData = songNode["metadata"].AsObject;
-            var songIndex = Regex.Replace($"{songNode["id"].Value} ({metaData["songName"].Value} - {metaData["levelAuthorName"].Value})", "[\\\\:*/?\"<>|]", "_");
+            var songIndex = s_invalidDirectoryAndFileChars.Replace($"{songNode["id"].Value} ({metaData["songName"].Value} - {metaData["levelAuthorName"].Value})", "_");
             var result = Path.Combine(Environment.CurrentDirectory, "Beat Saber_Data", "CustomLevels", songIndex);
             var count = 1;
             var resultLength = result.Length;
